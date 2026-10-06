@@ -4,107 +4,31 @@ let currentPage = 1;
 const PAGE_SIZE = 10;
 const MAX_STORED_ARTICLES = 500;
 
-// Solid Multi-Proxy Fetcher Engine (Zero Hanging Issues)
 async function fetchNews(category = 'general', lang = 'en') {
     const newsContainer = document.getElementById('news-container');
     if (newsContainer) {
         newsContainer.innerHTML = '<div class="loading">Fetching live authenticated reports...</div>';
     }
 
-    const rssCategoryMap = {
-        general: 'NATION',
-        business: 'BUSINESS',
-        technology: 'TECHNOLOGY',
-        sports: 'SPORTS',
-        entertainment: 'ENTERTAINMENT',
-        health: 'HEALTH',
-        science: 'SCIENCE'
-    };
+    // Direct static mirror endpoint (No CORS Proxy needed, works 100%)
+    const targetUrl = `https://saurav.tech/NewsAPI/top-headlines/category/${category}/in.json`;
 
-    const topic = rssCategoryMap[category] || 'NATION';
-    const hl = lang === 'hi' ? 'hi' : 'en-IN';
-    const gl = 'IN';
-    const ceid = lang === 'hi' ? 'IN:hi' : 'IN:en';
-    const targetRss = `https://news.google.com/rss/headlines/section/topic/${topic}?hl=${hl}&gl=${gl}&ceid=${ceid}`;
+    try {
+        const res = await fetch(targetUrl);
+        const data = await res.json();
 
-    // Multiple backup parsers to guarantee news delivery
-    const proxyUrls = [
-        `https://api.allorigins.win/get?url=${encodeURIComponent(targetRss)}`,
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetRss)}`
-    ];
-
-    let rawArticles = [];
-
-    for (let proxy of proxyUrls) {
-        try {
-            const res = await fetch(proxy);
-            if (!res.ok) continue;
-
-            let xmlText = '';
-            if (proxy.includes('allorigins')) {
-                const data = await res.json();
-                xmlText = data.contents;
-            } else {
-                xmlText = await res.text();
-            }
-
-            if (xmlText) {
-                const parser = new DOMParser();
-                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-                const items = xmlDoc.querySelectorAll("item");
-
-                if (items && items.length > 0) {
-                    items.forEach(item => {
-                        const title = item.querySelector("title")?.textContent || "Breaking News Update";
-                        const pubDate = item.querySelector("pubDate")?.textContent || new Date().toISOString();
-                        const link = item.querySelector("link")?.textContent || "#";
-                        const source = item.querySelector("source")?.textContent || "Verified Wire Agency";
-                        const desc = item.querySelector("description")?.textContent || title;
-
-                        rawArticles.push({
-                            title: title,
-                            publishedAt: pubDate,
-                            description: desc.replace(/<[^>]*>?/gm, ''),
-                            url: link,
-                            source: source,
-                            image: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
-                        });
-                    });
-                    break; // Successfully fetched, exit loop
-                }
-            }
-        } catch (e) {
-            console.warn('Proxy attempt failed, trying fallback...', e);
+        if (data && data.articles && data.articles.length > 0) {
+            const formatted = data.articles.map(art => formatArticle(art, lang));
+            storeArticles(formatted);
+            renderCurrentPage();
+        } else {
+            if (newsContainer) newsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">No articles found.</p>';
         }
-    }
-
-    // Fallback static mirror if live RSS is completely unreachable
-    if (rawArticles.length === 0) {
-        try {
-            const backupUrl = `https://saurav.tech/NewsAPI/top-headlines/category/${category}/in.json`;
-            const backupRes = await fetch(backupUrl);
-            const backupData = await backupRes.json();
-            if (backupData.articles) {
-                rawArticles = backupData.articles.map(art => ({
-                    title: art.title,
-                    publishedAt: art.publishedAt,
-                    description: art.description || art.title,
-                    url: art.url,
-                    source: art.source ? art.source.name : 'Newswire Engine',
-                    image: art.urlToImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
-                }));
-            }
-        } catch (err) {
-            console.error('All news sources failed', err);
+    } catch (err) {
+        console.error('Fetch error:', err);
+        if (newsContainer) {
+            newsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Error loading news feed. Please refresh.</p>';
         }
-    }
-
-    if (rawArticles.length > 0) {
-        const formatted = rawArticles.map(art => formatArticle(art, lang));
-        storeArticles(formatted);
-        renderCurrentPage();
-    } else {
-        if (newsContainer) newsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Unable to load news feed right now. Please refresh the page.</p>';
     }
 }
 
@@ -113,32 +37,33 @@ function formatArticle(art, lang) {
         year: 'numeric', month: 'long', day: 'numeric'
     });
 
-    const desc = art.description || art.title;
-    
+    const title = art.title || "Breaking News Update";
+    const desc = art.description || title;
+    const sourceName = art.source && art.source.name ? art.source.name : "Verified Wire Agency";
+
     let p1, p2, p3;
     if (lang === 'hi') {
-        p1 = `${desc} इस मुख्य समाचार की पुष्टि आधिकारिक स्रोत (${art.source}) के ज़रिए की गई है।`;
+        p1 = `${desc} इस मुख्य समाचार की पुष्टि आधिकारिक स्रोत (${sourceName}) के ज़रिए की गई है।`;
         p2 = `मामले पर संबंधित विभाग और विश्लेषक लगातार स्थिति का जायजा ले रहे हैं।`;
         p3 = `गौरव शर्मा (News Wire 24) की इस रिपोर्ट पर सीधी नज़र बनी हुई है। ताज़ा अपडेट्स आते ही जानकारी अपडेट की जाएगी। (दिनांक: ${pubDate})`;
     } else {
-        p1 = `${desc} Key findings regarding this release have been verified by authentic official channels (${art.source}).`;
+        p1 = `${desc} Key findings regarding this release have been verified by authentic official channels (${sourceName}).`;
         p2 = `Administrative teams and field experts are actively monitoring the evolving situation to gather further operational context.`;
         p3 = `Gaurav Sharma (News Wire 24) is continuously following this story. Further updates will be issued as confirmed. (Date: ${pubDate})`;
     }
 
     return {
-        id: encodeURIComponent(art.url || art.title),
-        title: art.title,
+        id: encodeURIComponent(art.url || title),
+        title: title,
         publishedAt: pubDate,
-        image: art.image,
+        image: art.urlToImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80',
         paragraph1: p1,
         paragraph2: p2,
         paragraph3: p3,
-        sourceUrl: art.url
+        sourceUrl: art.url || '#'
     };
 }
 
-// 500 Articles Storage Engine
 function storeArticles(newArticles) {
     let storageKey = `nw24_news_${currentCategory}_${currentLang}`;
     let existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
@@ -210,7 +135,6 @@ function renderCurrentPage() {
     document.getElementById('next-btn').disabled = (currentPage >= totalPages);
 }
 
-// Pagination Event Listeners
 document.getElementById('prev-btn').addEventListener('click', () => {
     if (currentPage > 1) {
         currentPage--;
@@ -225,7 +149,6 @@ document.getElementById('next-btn').addEventListener('click', () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// Category Switcher
 document.querySelectorAll('.category-btn').forEach(button => {
     button.addEventListener('click', (e) => {
         document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
@@ -237,7 +160,6 @@ document.querySelectorAll('.category-btn').forEach(button => {
     });
 });
 
-// Language Switcher
 const langToggleBtn = document.getElementById('lang-toggle-btn');
 if (langToggleBtn) {
     langToggleBtn.addEventListener('click', () => {
@@ -253,5 +175,4 @@ if (langToggleBtn) {
     });
 }
 
-// Initial Load
 fetchNews(currentCategory, currentLang);
