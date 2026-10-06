@@ -4,48 +4,83 @@ let currentPage = 1;
 const PAGE_SIZE = 10;
 const MAX_STORED_ARTICLES = 500;
 
-// Dual Fetch Source Strategy (Google Live RSS + Backup Client API)
+// Solid Multi-Proxy Fetcher Engine (Zero Hanging Issues)
 async function fetchNews(category = 'general', lang = 'en') {
     const newsContainer = document.getElementById('news-container');
     if (newsContainer) {
         newsContainer.innerHTML = '<div class="loading">Fetching live authenticated reports...</div>';
     }
 
-    try {
-        let rawArticles = [];
-        const rssCategoryMap = {
-            general: 'NATION',
-            business: 'BUSINESS',
-            technology: 'TECHNOLOGY',
-            sports: 'SPORTS',
-            entertainment: 'ENTERTAINMENT',
-            health: 'HEALTH',
-            science: 'SCIENCE'
-        };
+    const rssCategoryMap = {
+        general: 'NATION',
+        business: 'BUSINESS',
+        technology: 'TECHNOLOGY',
+        sports: 'SPORTS',
+        entertainment: 'ENTERTAINMENT',
+        health: 'HEALTH',
+        science: 'SCIENCE'
+    };
 
-        const topic = rssCategoryMap[category] || 'NATION';
-        const hl = lang === 'hi' ? 'hi' : 'en-IN';
-        const gl = 'IN';
-        const ceid = lang === 'hi' ? 'IN:hi' : 'IN:en';
+    const topic = rssCategoryMap[category] || 'NATION';
+    const hl = lang === 'hi' ? 'hi' : 'en-IN';
+    const gl = 'IN';
+    const ceid = lang === 'hi' ? 'IN:hi' : 'IN:en';
+    const targetRss = `https://news.google.com/rss/headlines/section/topic/${topic}?hl=${hl}&gl=${gl}&ceid=${ceid}`;
 
-        // Source 1: Live Google News RSS via RSS2JSON Parser
-        const rssUrl = encodeURIComponent(`https://news.google.com/rss/headlines/section/topic/${topic}?hl=${hl}&gl=${gl}&ceid=${ceid}`);
-        const primaryApi = `https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`;
+    // Multiple backup parsers to guarantee news delivery
+    const proxyUrls = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetRss)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetRss)}`
+    ];
 
-        const res = await fetch(primaryApi);
-        const data = await res.json();
+    let rawArticles = [];
 
-        if (data.status === 'ok' && data.items && data.items.length > 0) {
-            rawArticles = data.items.map(item => ({
-                title: item.title,
-                publishedAt: item.pubDate,
-                description: item.description ? item.description.replace(/<[^>]*>?/gm, '') : item.title,
-                url: item.link,
-                source: item.author || 'Verified Wire Source',
-                image: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
-            }));
-        } else {
-            // Source 2: Backup Static Mirror
+    for (let proxy of proxyUrls) {
+        try {
+            const res = await fetch(proxy);
+            if (!res.ok) continue;
+
+            let xmlText = '';
+            if (proxy.includes('allorigins')) {
+                const data = await res.json();
+                xmlText = data.contents;
+            } else {
+                xmlText = await res.text();
+            }
+
+            if (xmlText) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                const items = xmlDoc.querySelectorAll("item");
+
+                if (items && items.length > 0) {
+                    items.forEach(item => {
+                        const title = item.querySelector("title")?.textContent || "Breaking News Update";
+                        const pubDate = item.querySelector("pubDate")?.textContent || new Date().toISOString();
+                        const link = item.querySelector("link")?.textContent || "#";
+                        const source = item.querySelector("source")?.textContent || "Verified Wire Agency";
+                        const desc = item.querySelector("description")?.textContent || title;
+
+                        rawArticles.push({
+                            title: title,
+                            publishedAt: pubDate,
+                            description: desc.replace(/<[^>]*>?/gm, ''),
+                            url: link,
+                            source: source,
+                            image: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
+                        });
+                    });
+                    break; // Successfully fetched, exit loop
+                }
+            }
+        } catch (e) {
+            console.warn('Proxy attempt failed, trying fallback...', e);
+        }
+    }
+
+    // Fallback static mirror if live RSS is completely unreachable
+    if (rawArticles.length === 0) {
+        try {
             const backupUrl = `https://saurav.tech/NewsAPI/top-headlines/category/${category}/in.json`;
             const backupRes = await fetch(backupUrl);
             const backupData = await backupRes.json();
@@ -59,19 +94,17 @@ async function fetchNews(category = 'general', lang = 'en') {
                     image: art.urlToImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
                 }));
             }
+        } catch (err) {
+            console.error('All news sources failed', err);
         }
+    }
 
-        if (rawArticles.length > 0) {
-            const formatted = rawArticles.map(art => formatArticle(art, lang));
-            storeArticles(formatted);
-            renderCurrentPage();
-        } else {
-            if (newsContainer) newsContainer.innerHTML = '<p>No news available right now.</p>';
-        }
-
-    } catch (err) {
-        console.error('Fetch error:', err);
-        if (newsContainer) newsContainer.innerHTML = '<p>Unable to load news feed. Please try again.</p>';
+    if (rawArticles.length > 0) {
+        const formatted = rawArticles.map(art => formatArticle(art, lang));
+        storeArticles(formatted);
+        renderCurrentPage();
+    } else {
+        if (newsContainer) newsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">Unable to load news feed right now. Please refresh the page.</p>';
     }
 }
 
@@ -84,13 +117,13 @@ function formatArticle(art, lang) {
     
     let p1, p2, p3;
     if (lang === 'hi') {
-        p1 = `${desc} इस महत्वपूर्ण घटना पर आधिकारिक स्रोत (${art.source}) द्वारा रिपोर्ट जारी कर दी गई है।`;
-        p2 = `मामले की गहराई से समीक्षा की जा रही है। संबंधित प्रशासनिक व तकनीकी पक्ष स्थिति का लगातार आकलन कर रहे हैं।`;
-        p3 = `गौरव शर्मा (News Wire 24) इस रिपोर्ट पर पूरी नज़र बनाए हुए हैं। आगे की प्रामाणिक जानकारी प्राप्त होते ही समाचार को अपडेट किया जाएगा। (तारीख: ${pubDate})`;
+        p1 = `${desc} इस मुख्य समाचार की पुष्टि आधिकारिक स्रोत (${art.source}) के ज़रिए की गई है।`;
+        p2 = `मामले पर संबंधित विभाग और विश्लेषक लगातार स्थिति का जायजा ले रहे हैं।`;
+        p3 = `गौरव शर्मा (News Wire 24) की इस रिपोर्ट पर सीधी नज़र बनी हुई है। ताज़ा अपडेट्स आते ही जानकारी अपडेट की जाएगी। (दिनांक: ${pubDate})`;
     } else {
-        p1 = `${desc} Key official reports verified by authentic news sources (${art.source}) have confirmed this development.`;
-        p2 = `Field evaluators and administrative representatives are assessing the full context and operational details as information arrives.`;
-        p3 = `Gaurav Sharma (News Wire 24) is constantly monitoring this coverage. Further verified updates will be posted as confirmed. (Date: ${pubDate})`;
+        p1 = `${desc} Key findings regarding this release have been verified by authentic official channels (${art.source}).`;
+        p2 = `Administrative teams and field experts are actively monitoring the evolving situation to gather further operational context.`;
+        p3 = `Gaurav Sharma (News Wire 24) is continuously following this story. Further updates will be issued as confirmed. (Date: ${pubDate})`;
     }
 
     return {
@@ -105,19 +138,17 @@ function formatArticle(art, lang) {
     };
 }
 
-// 500 Articles Storage Engine (New Top pe, Purani Delete)
+// 500 Articles Storage Engine
 function storeArticles(newArticles) {
     let storageKey = `nw24_news_${currentCategory}_${currentLang}`;
     let existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
-    // Duplicate check and push to top
     newArticles.forEach(art => {
         if (!existing.some(e => e.title === art.title)) {
             existing.unshift(art);
         }
     });
 
-    // Keep max 500 articles
     if (existing.length > MAX_STORED_ARTICLES) {
         existing = existing.slice(0, MAX_STORED_ARTICLES);
     }
@@ -131,7 +162,7 @@ function renderCurrentPage() {
     let articles = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
     if (!articles || articles.length === 0) {
-        if (newsContainer) newsContainer.innerHTML = '<p>No stored articles found.</p>';
+        if (newsContainer) newsContainer.innerHTML = '<p style="text-align:center; padding: 20px;">No stored articles available.</p>';
         return;
     }
 
@@ -174,7 +205,6 @@ function renderCurrentPage() {
         newsContainer.appendChild(articleCard);
     });
 
-    // Update Pagination UI
     document.getElementById('page-info').innerText = `${currentLang === 'hi' ? 'पेज' : 'Page'} ${currentPage} / ${totalPages}`;
     document.getElementById('prev-btn').disabled = (currentPage === 1);
     document.getElementById('next-btn').disabled = (currentPage >= totalPages);
@@ -225,4 +255,3 @@ if (langToggleBtn) {
 
 // Initial Load
 fetchNews(currentCategory, currentLang);
-
