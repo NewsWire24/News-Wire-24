@@ -1,1 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Wire 24 - Live & Authenticated News</title>
+    <style>
+        :root {
+            --primary: #c0392b;
+            --dark: #2c3e50;
+            --bg: #f8f9fa;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: var(--bg);
+            color: #333;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        .btn-toggle {
+            background: white;
+            color: var(--primary);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        nav {
+            background: var(--dark);
+            display: flex;
+            overflow-x: auto;
+            padding: 10px;
+        }
+        .category-btn {
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            margin-right: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+        .category-btn.active, .category-btn:hover {
+            background: var(--primary);
+        }
+        main {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        .article-card {
+            background: white;
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .article-title {
+            margin-top: 0;
+            font-size: 22px;
+            color: #111;
+        }
+        .article-byline {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        .article-img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .article-body p {
+            line-height: 1.6;
+            margin-bottom: 12px;
+            color: #444;
+        }
+        .share-section {
+            margin-top: 15px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .share-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .share-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: white;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+        }
+        .share-wa { background: #25D366; }
+        .share-fb { background: #1877F2; }
+        .share-x { background: #000000; }
+        .share-link { background: #6c757d; }
+        
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 30px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .page-btn {
+            background: var(--dark);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .page-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .page-info {
+            font-weight: bold;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">News Wire 24</div>
+        <button id="lang-toggle-btn" class="btn-toggle">🌐 Switch to Hindi</button>
+    </header>
+
+    <nav>
+        <button class="category-btn active" data-category="general">General</button>
+        <button class="category-btn" data-category="business">Business</button>
+        <button class="category-btn" data-category="technology">Technology</button>
+        <button class="category-btn" data-category="sports">Sports</button>
+        <button class="category-btn" data-category="entertainment">Entertainment</button>
+        <button class="category-btn" data-category="health">Health</button>
+        <button class="category-btn" data-category="science">Science</button>
+    </nav>
+
+    <main id="news-container">
+        <div class="loading">Loading news...</div>
+    </main>
+
+    <div class="pagination-container">
+        <button id="prev-btn" class="page-btn" disabled>← Previous</button>
+        <span id="page-info" class="page-info">Page 1</span>
+        <button id="next-btn" class="page-btn">Next →</button>
+    </div>
+
+    <script src="app.js?v=3001"></script>
+</body>
+</html>
 
