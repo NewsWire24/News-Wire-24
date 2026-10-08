@@ -1,1 +1,19 @@
+name: News Wire 24 Auto Update
+on:
+  schedule:
+    - cron: '30 2 * * *'   # 8 AM IST
+    - cron: '30 6 * * *'   # 12 PM IST
+    - cron: '30 9 * * *'   # 3 PM IST
+    - cron: '30 15 * * *'  # 9 PM IST
+    - cron: '30 18 * * *'  # 12 AM IST
+  workflow_dispatch:
 
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Fetch & Rewrite News
+        run: |
+          echo "Yaha NewsData.io se news fetch + Gemini se re-write hoga"
+          # Is step ka full code main agle message me dunga API key ke saath
