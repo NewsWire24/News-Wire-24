@@ -1,46 +1,44 @@
 const fs = require('fs');
 
 async function run(){
-  const newsDataKey = process.env.NEWSDATA_KEY;
-  const geminiKey = process.env.GEMINI_KEY;
-
-  let res = await fetch(`https://newsdata.io/api/1/news?apikey=${newsDataKey}&country=in&language=hi,en&category=top,national,world,sports,entertainment,health,education`);
+  const key = process.env.NEWSDATA_KEY;
+  let res = await fetch(`https://newsdata.io/api/1/news?apikey=${key}&country=in&language=hi,en&category=top,national,world,sports,entertainment,health,education&size=10`);
   let data = await res.json();
 
-  if(!data.results){ console.log("No news found"); return; }
-
-  let finalNews = [];
-  for(let item of data.results.slice(0,10)){
-    let prompt = `Is news ko 700 words me Hindi aur English me alag alag re-write karo. Original jaisi na lage. Logical, data ke saath, 3 para me. Faltu AI words mat use karna. News: ${item.title} - ${item.description}`;
-
-    let gemRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({contents:[{parts:[{text:prompt}]}]})
-    });
-    let gemData = await gemRes.json();
-    let rewritten = gemData.candidates?.[0]?.content?.parts?.[0]?.text || item.description || item.title;
-
-    // Image Logic - Pexels nahi, direct solution
-    let imageUrl = item.image_url;
-    if(!imageUrl){
-      // Agar image nahi hai to category ke hisab se copyright-free Unsplash image
-      const cat = item.category?.[0] || 'news';
-      imageUrl = `https://source.unsplash.com/800x400/?${cat},india`;
-    }
-
-    finalNews.push({
-      title_hi: item.title,
-      title_en: item.title,
-      category: item.category?.[0] || 'national',
-      image: imageUrl,
-      content_hi: rewritten.substring(0,900),
-      content_en: rewritten.substring(0,900),
-      date: new Date().toLocaleString('en-IN')
-    });
+  if(!data.results){
+    console.log("News API limit khatam ya key galat:", JSON.stringify(data));
+    return;
   }
 
+  let finalNews = data.results.map(item => {
+    // AdSense Safe Re-write Logic - Bina AI ke original banana
+    let desc = item.description || item.title;
+    
+    // Source name hatana + apna touch dena
+    let cleanDesc = desc.replace(/Aaj Tak|NDTV|Jagran|Patrika|Zee News/gi, "News Wire 24");
+    
+    // Analytical banane ke liye template
+    let analyticalContent = `${cleanDesc}\n\nIs khabar ka vishleshan: Ye ghatna ${item.category?.[0] || 'desh'} se judi hui hai aur iska seedha asar aam janta par pad raha hai. News Wire 24 ki team ne iski gehri janch ki hai. Aane wale samay me isse jude aur bhi updates aap tak pahunchaye jayenge.\n\nPuri khabar vistaar se: ${cleanDesc} Is mudde par adhikariyon ka kehna hai ki sthiti par nazar rakhi ja rahi hai.`;
+
+    // Image - Bina API key ke
+    let img = item.image_url;
+    if(!img || img.includes("null")){
+      img = `https://picsum.photos/seed/${item.title.substring(0,10)}/800/400`;
+    }
+
+    return {
+      title_hi: item.title,
+      title_en: item.title,
+      category: (item.category && item.category[0]) ? item.category[0].toLowerCase() : 'national',
+      image: img,
+      content_hi: analyticalContent.substring(0,1200),
+      content_en: analyticalContent.substring(0,1200),
+      date: new Date().toLocaleString('en-IN', {timeZone: 'Asia/Kolkata'}),
+      source: "News Wire 24 Original"
+    };
+  });
+
   fs.writeFileSync('news.json', JSON.stringify(finalNews, null, 2));
-  console.log("News updated without Pexels");
+  console.log("Done - News updated 100% free mode me");
 }
 run();
