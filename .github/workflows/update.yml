@@ -1,5 +1,4 @@
 name: News Wire 24 Auto Update
-
 on:
   schedule:
     - cron: '30 2 * * *'
@@ -8,7 +7,6 @@ on:
     - cron: '30 15 * * *'
     - cron: '30 18 * * *'
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,5 +24,5 @@ jobs:
           git config --global user.name "News Wire Bot"
           git config --global user.email "bot@newswire24.com"
           git add news.json
-          git commit -m "auto update free mode" || echo "no changes"
+          git commit -m "auto update" || echo "no changes"
           git push
