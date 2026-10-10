@@ -1,22 +1,25 @@
 const fs = require('fs');
-async function run(){
-  try{
-    const key = process.env.NEWSDATA_KEY;
-    if(!key){ console.log("API Key missing"); return; }
-    let res = await fetch(`https://newsdata.io/api/1/news?apikey=${key}&country=in&language=en&size=10`);
-    let data = await res.json();
-    if(!data.results){ console.log(JSON.stringify(data)); return; }
-    let finalNews = data.results.map(item => ({
-      title_hi: item.title,
-      title_en: item.title,
-      category: (item.category?.[0] || 'national').toLowerCase(),
-      image: item.image_url || `https://picsum.photos/seed/${Date.now()}/800/400`,
-      content_hi: (item.description || item.title) + " . News Wire 24 ki vishleshan team dwara.",
-      content_en: (item.description || item.title) + " . Analyzed by News Wire 24.",
-      date: new Date().toLocaleString('en-IN', {timeZone: 'Asia/Kolkata'})
-    }));
-    fs.writeFileSync('news.json', JSON.stringify(finalNews, null, 2));
-    console.log("Success");
-  }catch(e){ console.log(e); }
+const API_KEY = process.env.NEWS_API_KEY; // GitHub secret se ayega
+
+async function translateToHindi(text) {
+  try {
+    // Free MyMemory API - sahi Hindi deta hai Hinglish nahi
+    const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|hi`);
+    const data = await res.json();
+    return data.responseData.translatedText || text;
+  } catch {
+    return text; // fail hua to English hi rehne de
+  }
 }
-run();
+
+async function getNews() {
+  let articles = [];
+  try {
+    // Category wise 5-5 news layega = 25 total
+    const categories = ['national', 'world', 'sports', 'entertainment', 'business'];
+    for (let cat of categories) {
+      const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=en&category=${cat}&size=5`;
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.results) {
+       
